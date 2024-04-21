@@ -49,6 +49,10 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
+/* Assignment Implementaion */
+int64_t next_wakeup_tick;
+static struct list sleep_list;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -108,6 +112,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -587,4 +592,63 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+
+/* Assignment Implementation */
+
+/* sleep 중인 스레드 중 가장 먼저 일어나야 할 스레드가 일어날 ticks 반환 */
+int64_t get_next_wakeup_thread_ticks(void){
+	return next_wakeup_tick;
+}
+
+/* sleep 중인 스레드 중 가장 먼저 일어나야 할 스레드가 일어날 ticks 업데이트 */
+void update_next_wakeup_tick(int64_t ticks) {
+	// next_tick_to_awake 변수가 깨워야 하는 스레드의 깨어날 tick 값 중 가장 작은 tick
+	// 갖도록 업데이트
+	next_wakeup_tick = (next_wakeup_tick > ticks) ? ticks : next_wakeup_tick;
+}
+
+/* 현재 스레드를 ticks 까지 재우는 함수 */
+void thread_sleep(int64_t ticks){
+	struct thread* cur;
+	// intr_off -> processing -> intr_on
+
+	// 인터럽트를 금지하고 이전 인터럽트 레벨을 저장함
+	enum intr_level old_level;
+	old_level = intr_disable();
+    
+	// idle 스레드는 sleep되지 않아야 함
+	cur = thread_current();
+	ASSERT(cur != idle_thread);
+
+	// wakeup 함수가 실행되어야 할 tick 값을 update
+	update_next_wakeup_tick(cur->wakeup_tick = ticks);
+
+	// 현재 스레드를 슬립 큐에 삽입한 후 스케줄
+	list_push_back(&sleep_list, &cur->elem);
+
+	// 이 스레드를 블락하고 다시 스케줄 될 때까지 블락된 상태로 대기
+	thread_block();
+
+	// 인터럽트를 다시 받아들이도록 수정
+	intr_set_level(old_level);
+}
+
+// tick을 확인하면서 일정 시간이 지난 sleep 상태 thread 깨우기
+void thread_wakeup(int64_t wakeup_tick){
+	next_wakeup_tick = INT64_MAX;
+	struct list_elem* e;
+	e = list_begin(&sleep_list);
+	while (e != list_end(&sleep_list)) {
+		struct thread* t = list_entry(e, struct thread, elem);
+
+		if (wakeup_tick >= t->wakeup_tick) {
+			e = list_remove(&t->elem);
+			thread_unblock(t); // 스레드 언블락
+		} else {
+			e = list_next(e);
+			update_next_wakeup_tick(t->wakeup_tick);
+		}
+	}
 }
