@@ -130,7 +130,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	// sleep_list 에서 깨어날 수 있는 thread가 있는 지 확인하고 깨움
-	if(get_next_wakeup_tick() <= ticks){
+	if(get_next_wakeup_thread_tick() <= ticks){
 		thread_wakeup(ticks);
 	}
 }

@@ -32,6 +32,10 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* Assignment Impelementation */
+/* Prototype */
+bool sema_compare_priority(const struct list_elem *higher, const struct list_elem *lower, void *aux UNUSED);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -66,7 +70,8 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) {
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+		// list_push_back (&sema->waiters, &thread_current ()->elem); // previous code
+		list_insert_ordered(&sema->waiters, &thread_current()->elem, compare_thread_priority, 0);
 		thread_block ();
 	}
 	sema->value--;
@@ -109,10 +114,14 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	if (!list_empty (&sema->waiters)){
+		list_sort(&sema->waiters, compare_thread_priority, 0); // waiter를 내림차순으로 정렬
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
+	}
+		
 	sema->value++;
+	preemption_by_priority();
 	intr_set_level (old_level);
 }
 
@@ -183,12 +192,12 @@ lock_init (struct lock *lock) {
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
 void
-lock_acquire (struct lock *lock) {
+lock_acquire (struct lock* lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	struct thread *cur = thread_current();
+	struct thread* cur = thread_current();
 	if (lock->holder) {
 		cur->wait_on_lock = lock;
 		// lock을 가지고 있는 스레드의 donations에 현재 스레드 elem 추가
@@ -197,6 +206,8 @@ lock_acquire (struct lock *lock) {
 	}
 
 	sema_down (&lock->semaphore);
+
+	cur->wait_on_lock = NULL;
 	lock->holder = thread_current ();
 }
 
@@ -296,7 +307,7 @@ cond_wait (struct condition *cond, struct lock *lock) {
 
 	sema_init (&waiter.semaphore, 0);
 	// list_push_back (&cond->waiters, &waiter.elem); // previous code
-	list_insert_ordered(&cond->waiters, &waiter.elem, sema_compare_priority,0);
+	list_insert_ordered(&cond->waiters, &waiter.elem, sema_compare_priority, 0);
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
@@ -340,7 +351,7 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 }
 
 /* 여러 세마포어들의 리스트 중 가장 우선순위가 높은 하나의 세마포어를 깨우기 위한 함수 */
-bool sema_compare_priority(const struct list_elem *higher, const struct list_elem *lower, void *aux UNUSED) {
+bool sema_compare_priority(const struct list_elem* higher, const struct list_elem* lower, void* aux UNUSED) {
 	struct semaphore_elem *higher_sema = list_entry(higher, struct semaphore_elem, elem);
 	struct semaphore_elem *lower_sema = list_entry(lower, struct semaphore_elem, elem);
 
