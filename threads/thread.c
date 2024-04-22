@@ -54,7 +54,6 @@ int64_t next_wakeup_tick;
 static struct list sleep_list;
 int64_t get_next_wakeup_thread_tick(void);
 
-
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -621,7 +620,7 @@ allocate_tid (void) {
 /* Assignment Implementation */
 
 /* sleep 중인 스레드 중 가장 먼저 일어나야 할 스레드가 일어날 ticks 반환 */
-int64_t get_next_wakeup_thread_ticks(void){
+int64_t get_next_wakeup_thread_tick(void){
 	return next_wakeup_tick;
 }
 
@@ -718,7 +717,7 @@ void donate_priority(void){
 	}
 }
 
-/* Remove thread from donations list*/
+/* Remove thread from donations list */
 void remove_with_lock(struct lock *lock) {
 	struct list_elem *e;
 	struct thread *cur = thread_current();
@@ -733,14 +732,14 @@ void remove_with_lock(struct lock *lock) {
 
 /* reset priority */
 void reset_priority(void) {
-	struct thread *cur = thread_current();
+	struct thread* cur = thread_current();
 
 	cur->priority = cur->init_priority;		// 원래 우선순위 원복
 
 	if (!list_empty(&cur->donations)) {		// donations 리스트가 비어 있지 않다면(아직 우선순위를 줄 스레드가 있다면)
 		list_sort(&cur->donations, compare_thread_donation_priority, 0);	// donations 내림차순으로 정렬(가장 큰 우선순위 맨 앞으로)
 
-		struct thread *front = list_entry(list_front(&cur->donations), struct thread, donation_elem);
+		struct thread* front = list_entry(list_front(&cur->donations), struct thread, donation_elem);
 		if (front->priority > cur->priority) {
 			cur->priority = front->priority;	// 가장 높은 값의 우선순위로 수정
 		}

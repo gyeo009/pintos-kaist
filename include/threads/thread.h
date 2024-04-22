@@ -157,6 +157,7 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 /* Assignment Implementation */
+int64_t get_next_wakeup_thread_tick(void);
 void preemption_by_priority(void);
 bool compare_thread_priority(const struct list_elem* A, const struct list_elem* B, void* aux UNUSED);
 bool compare_thread_donation_priority(const struct list_elem* A, const struct list_elem* B, void* aux UNUSED);
