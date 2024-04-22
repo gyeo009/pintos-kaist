@@ -93,7 +93,17 @@ struct thread {
 	int priority;                       /* Priority. */
 
 	/* Assignment Implementation */
-	int64_t wakeup_tick;				/* 깨어나야 될 tick을 */
+	/* for alarm clock */
+	int64_t wakeup_tick;				/* for alarm clock - 깨어나야 할 시간*/
+
+	/* for priority scheduling */
+	int init_priority;                  /* Priority 양도 전 thread의 원래 priority. */
+	
+	/* for donation */
+	struct lock* wait_on_lock;			/* 스레드가 얻고자 하는 lock */
+	struct list donations;				/* 본 스레드에게 priority를 양도해준 다른 스레드 리스트 */
+	struct list_elem donation_elem;    /* struct donations의 관리를 위한 element */
+
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
@@ -145,5 +155,14 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+/* Assignment Implementation */
+void preemption_by_priority(void);
+bool compare_thread_priority(const struct list_elem* A, const struct list_elem* B, void* aux UNUSED);
+bool compare_thread_donation_priority(const struct list_elem* A, const struct list_elem* B, void* aux UNUSED);
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void reset_priority(void);
+
 
 #endif /* threads/thread.h */

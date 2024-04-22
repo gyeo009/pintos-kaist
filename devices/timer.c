@@ -93,11 +93,10 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	// oridnary code
+	// // Previous Code
 	// while (timer_elapsed (start) < ticks)
-	// 	thread_yield ();
-
-	thread_sleep(start + ticks);
+	// 	thread_yield (); // CPU 상의 현재 스레드를 방출하고 ready_list의 맨 마지막으로 삽입
+	thread_sleep(start+ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -130,9 +129,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
 
-	// 한 tick마다 sleep queue에서 깰 thread가 있는지 확인하기
-	// 있다면 thread_wakeup(ticks); 호출
-	if(get_next_wakeup_thread_tick() <= ticks){
+	// sleep_list 에서 깨어날 수 있는 thread가 있는 지 확인하고 깨움
+	if(get_next_wakeup_tick() <= ticks){
 		thread_wakeup(ticks);
 	}
 }
